@@ -6,6 +6,118 @@
 
 using namespace antlr4;
 
+// Helper functions for arithmetic operations
+std::any addValues(const std::any& a, const std::any& b) {
+    // Try int + int
+    try {
+        long long a_val = std::any_cast<long long>(a);
+        long long b_val = std::any_cast<long long>(b);
+        return a_val + b_val;
+    } catch (...) {
+        // Not both ints
+    }
+
+    // Try double + double or double + int or int + double
+    try {
+        double a_val, b_val;
+
+        try {
+            a_val = std::any_cast<long long>(a);
+        } catch (...) {
+            a_val = std::any_cast<double>(a);
+        }
+
+        try {
+            b_val = std::any_cast<long long>(b);
+        } catch (...) {
+            b_val = std::any_cast<double>(b);
+        }
+
+        return a_val + b_val;
+    } catch (...) {
+        // Not numeric types
+    }
+
+    // Try string concatenation
+    try {
+        std::string a_str = std::any_cast<std::string>(a);
+        std::string b_str = std::any_cast<std::string>(b);
+        return a_str + b_str;
+    } catch (...) {
+        // Not strings
+    }
+
+    return nullptr;
+}
+
+std::any subtractValues(const std::any& a, const std::any& b) {
+    // Try int - int
+    try {
+        long long a_val = std::any_cast<long long>(a);
+        long long b_val = std::any_cast<long long>(b);
+        return a_val - b_val;
+    } catch (...) {
+        // Not both ints
+    }
+
+    // Try double - double or double - int or int - double
+    try {
+        double a_val, b_val;
+
+        try {
+            a_val = std::any_cast<long long>(a);
+        } catch (...) {
+            a_val = std::any_cast<double>(a);
+        }
+
+        try {
+            b_val = std::any_cast<long long>(b);
+        } catch (...) {
+            b_val = std::any_cast<double>(b);
+        }
+
+        return a_val - b_val;
+    } catch (...) {
+        // Not numeric types
+    }
+
+    return nullptr;
+}
+
+std::any multiplyValues(const std::any& a, const std::any& b) {
+    // Try int * int
+    try {
+        long long a_val = std::any_cast<long long>(a);
+        long long b_val = std::any_cast<long long>(b);
+        return a_val * b_val;
+    } catch (...) {
+        // Not both ints
+    }
+
+    // Try double * double or double * int or int * double
+    try {
+        double a_val, b_val;
+
+        try {
+            a_val = std::any_cast<long long>(a);
+        } catch (...) {
+            a_val = std::any_cast<double>(a);
+        }
+
+        try {
+            b_val = std::any_cast<long long>(b);
+        } catch (...) {
+            b_val = std::any_cast<double>(b);
+        }
+
+        return a_val * b_val;
+    } catch (...) {
+        // Not numeric types
+    }
+
+    return nullptr;
+}
+
 // Helper function to convert any to string for printing
 std::string anyToString(const std::any& value) {
     if (!value.has_value()) {
@@ -212,17 +324,65 @@ std::any EvalVisitor::visitComparison(Python3Parser::ComparisonContext *ctx) {
 }
 
 std::any EvalVisitor::visitArith_expr(Python3Parser::Arith_exprContext *ctx) {
-    if (ctx->term().size() == 1) {
-        return visit(ctx->term(0));
+    // arith_expr: term (addorsub_op term)*
+    auto terms = ctx->term();
+    if (terms.empty()) {
+        return nullptr;
     }
-    return nullptr;
+
+    // Start with first term
+    auto result = visit(terms[0]);
+
+    // Process remaining terms with operators
+    auto ops = ctx->addorsub_op();
+    for (size_t i = 1; i < terms.size(); i++) {
+        auto term = terms[i];
+        auto termValue = visit(term);
+
+        if (i - 1 < ops.size()) {
+            auto op = ops[i - 1];
+            if (op->ADD()) {
+                // Addition
+                result = addValues(result, termValue);
+            } else if (op->MINUS()) {
+                // Subtraction
+                result = subtractValues(result, termValue);
+            }
+        }
+    }
+
+    return result;
 }
 
 std::any EvalVisitor::visitTerm(Python3Parser::TermContext *ctx) {
-    if (ctx->factor().size() == 1) {
-        return visit(ctx->factor(0));
+    // term: factor (muldivmod_op factor)*
+    auto factors = ctx->factor();
+    if (factors.empty()) {
+        return nullptr;
     }
-    return nullptr;
+
+    // Start with first factor
+    auto result = visit(factors[0]);
+
+    // Process remaining factors with operators
+    auto ops = ctx->muldivmod_op();
+    for (size_t i = 1; i < factors.size(); i++) {
+        auto factor = factors[i];
+        auto factorValue = visit(factor);
+
+        if (i - 1 < ops.size()) {
+            auto op = ops[i - 1];
+            if (op->STAR()) {
+                // Multiplication
+                result = multiplyValues(result, factorValue);
+            } else if (op->DIV() || op->IDIV() || op->MOD()) {
+                // Division, integer division, modulo - not implemented yet
+                // For now, just return the first value
+            }
+        }
+    }
+
+    return result;
 }
 
 std::any EvalVisitor::visitFactor(Python3Parser::FactorContext *ctx) {

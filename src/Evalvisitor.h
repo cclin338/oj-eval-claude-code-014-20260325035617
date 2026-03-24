@@ -8,6 +8,11 @@
 #include <unordered_map>
 #include <iostream>
 
+// Forward declarations for helper functions
+std::any addValues(const std::any& a, const std::any& b);
+std::any subtractValues(const std::any& a, const std::any& b);
+std::any multiplyValues(const std::any& a, const std::any& b);
+
 class EvalVisitor : public Python3ParserBaseVisitor {
 private:
     std::unordered_map<std::string, std::any> variables;
